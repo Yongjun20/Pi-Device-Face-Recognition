@@ -56,10 +56,11 @@ class FaceRecognitionApp:
         self._build_fonts()
         self._build_ui()
         self.pc_save_path = None
+        self.auto_capture_enabled = False
         self._load_pc_path()
         self.refresh_dataset()
         self.current_user = None
-        self.admin_ntid = None
+        self.admin_list = []
         self._load_admin()
         self._set_default_permissions()
         self._mount_server()
@@ -119,7 +120,7 @@ class FaceRecognitionApp:
         )
         self.logout_btn.pack(side="right", padx=8)
 
-        # ⚙ Settings icon button — replaces old Credentials button
+        # ⚙ Settings icon button
         self.settings_btn = tk.Button(
             header,
             text="⚙",
@@ -247,36 +248,41 @@ class FaceRecognitionApp:
         )
         self.name_entry.pack(fill="x", padx=1, pady=1, ipady=8, ipadx=8)
 
-        # Buttons grid
+        # ── Button grid ──────────────────────────────────────
+        # Layout:
+        #   Row 0: [Capture Face]  [Delete User]   ← 2 equal columns
+        #   Row 1: [   Train Model             ]   ← spans 2 columns
+        #   Row 2: [   Recognize Face          ]   ← spans 2 columns
+        #   Row 3: [        Stop               ]   ← spans 2 columns
+        # ─────────────────────────────────────────────────────
         btn_grid = tk.Frame(inner, bg=CARD)
         btn_grid.pack(fill="x")
+        btn_grid.columnconfigure(0, weight=1)
+        btn_grid.columnconfigure(1, weight=1)
 
+        # Row 0 — Capture (toggles to Take Photo) | Delete User
         self.capture_btn = self._btn(btn_grid, "Capture Face",
                                      ACCENT, self.start_capture)
-        self.capture_btn.grid(row=0, column=0, padx=(0, 8), pady=4, sticky="ew")
-
-        self.snap_btn = self._btn(btn_grid, "Take Photo",
-                                  SUCCESS, self.trigger_capture, state="disabled")
-        self.snap_btn.grid(row=0, column=1, pady=4, sticky="ew")
-
-        self.train_btn = self._btn(btn_grid, "Train Model",
-                                   ACCENT, self.start_train)
-        self.train_btn.grid(row=1, column=0, padx=(0, 8), pady=4, sticky="ew")
-
-        self.recog_btn = self._btn(btn_grid, "Recognize Face",
-                                   ACCENT, self.start_recognition_thread)
-        self.recog_btn.grid(row=1, column=1, pady=4, sticky="ew")
-
-        self.stop_btn = self._btn(btn_grid, "Stop",
-                                  DANGER, self.stop_all, state="disabled")
-        self.stop_btn.grid(row=2, column=0, padx=(0, 8), pady=4, sticky="ew")
+        self.capture_btn.grid(row=0, column=0, padx=(0, 4), pady=4, sticky="ew")
 
         self.delete_btn = self._btn(btn_grid, "Delete User",
                                     DANGER, self.delete_user)
-        self.delete_btn.grid(row=2, column=1, pady=4, sticky="ew")
+        self.delete_btn.grid(row=0, column=1, pady=4, sticky="ew")
 
-        btn_grid.columnconfigure(0, weight=1)
-        btn_grid.columnconfigure(1, weight=1)
+        # Row 1 — Train Model (full width)
+        self.train_btn = self._btn(btn_grid, "Train Model",
+                                   ACCENT, self.start_train)
+        self.train_btn.grid(row=1, column=0, columnspan=2, pady=4, sticky="ew")
+
+        # Row 2 — Recognize Face (full width)
+        self.recog_btn = self._btn(btn_grid, "Recognize Face",
+                                   ACCENT, self.start_recognition_thread)
+        self.recog_btn.grid(row=2, column=0, columnspan=2, pady=4, sticky="ew")
+
+        # Row 3 — Stop (full width)
+        self.stop_btn = self._btn(btn_grid, "Stop",
+                                  DANGER, self.stop_all, state="disabled")
+        self.stop_btn.grid(row=3, column=0, columnspan=2, pady=4, sticky="ew")
 
         # ----------------------------
         # PC Save Path — read only, shows value from settings
@@ -287,15 +293,14 @@ class FaceRecognitionApp:
         tk.Label(settings_frame, text="PC Save Path (set via ⚙ Settings)",
                  font=self.font_label, bg=CARD, fg=TEXT_SEC).pack(anchor="w")
 
-        # Read-only greyed out entry — user cannot type here
         self.pc_path_entry = tk.Entry(
             settings_frame,
             font=self.font_body,
-            bg="#F3F4F6",       # grey background to show it is read only
+            bg="#F3F4F6",
             fg=TEXT_SEC,
             relief="flat",
             insertbackground=TEXT_PRI,
-            state="readonly"    # read only — only settings popup can change this
+            state="readonly"
         )
         self.pc_path_entry.pack(fill="x", pady=(4, 6), ipady=6, ipadx=6)
 
@@ -473,26 +478,44 @@ class FaceRecognitionApp:
     # Admin setup
     # --------------------------------------------------------
     def _load_admin(self):
+        self.admin_list = []
         if os.path.exists(ADMIN_FILE):
             try:
                 with open(ADMIN_FILE, "r") as f:
-                    self.admin_ntid = f.read().strip()
+                    lines = f.read().splitlines()
+                self.admin_list = [l.strip() for l in lines if l.strip()]
             except:
-                self.admin_ntid = None
+                self.admin_list = []
 
     def _save_admin(self, ntid):
         try:
+            if ntid not in self.admin_list:
+                self.admin_list.append(ntid)
             with open(ADMIN_FILE, "w") as f:
-                f.write(ntid)
-            self.admin_ntid = ntid
+                f.write("\n".join(self.admin_list))
             self.log(f"Admin registered: {ntid}", "success")
         except Exception as e:
             self.log(f"Failed to save admin: {e}", "error")
 
+    def _remove_admin(self, ntid):
+        if ntid == self.current_user:
+            messagebox.showerror("Error", "You cannot remove yourself as admin.")
+            return False
+        if len(self.admin_list) <= 1:
+            messagebox.showerror("Error", "Cannot remove the last admin.")
+            return False
+        try:
+            self.admin_list.remove(ntid)
+            with open(ADMIN_FILE, "w") as f:
+                f.write("\n".join(self.admin_list))
+            self.log(f"Admin removed: {ntid}", "warn")
+            return True
+        except Exception as e:
+            self.log(f"Failed to remove admin: {e}", "error")
+            return False
+
     # --------------------------------------------------------
-    # Settings popup — replaces old Credentials button
-    # Has 3 fields: NTID, Password, PC Server Path
-    # On Save: unmount → mount → verify → save to settings.json
+    # Settings popup
     # --------------------------------------------------------
     def _open_settings(self):
         import json
@@ -500,7 +523,7 @@ class FaceRecognitionApp:
 
         win = tk.Toplevel(self.root)
         win.title("Settings")
-        win.geometry("420x320")
+        win.geometry("420x520")
         win.resizable(False, False)
         win.configure(bg=CARD)
         win.grab_set()
@@ -524,12 +547,11 @@ class FaceRecognitionApp:
         password_entry = tk.Entry(form, font=self.font_body, relief="flat",
                                   bg=BG, fg=TEXT_PRI, show="*")
         password_entry.pack(fill="x", pady=(2, 10), ipady=6)
-        show_pwd = tk.BooleanVar(value=False)
 
         # --- Eye icon (press & hold to show password) ---
         eye_btn = tk.Label(form, text="Show", font=self.font_body,
                         bg=CARD, fg=TEXT_SEC, cursor="hand2")
-        eye_btn.place(relx=0.95, rely=0.47, anchor="ne")  # adjust position if needed
+        eye_btn.place(relx=0.95, rely=0.42, anchor="ne")
 
         def show_password(event=None):
             password_entry.config(show="")
@@ -537,18 +559,31 @@ class FaceRecognitionApp:
         def hide_password(event=None):
             password_entry.config(show="*")
 
-        # Bind mouse press & release
         eye_btn.bind("<ButtonPress-1>", show_password)
         eye_btn.bind("<ButtonRelease-1>", hide_password)
-        eye_btn.bind("<Leave>", hide_password)  # if mouse leaves while holding
+        eye_btn.bind("<Leave>", hide_password)
 
-    
         # --- PC Server Path field ---
         tk.Label(form, text="PC Server Path  (e.g. \\\\server\\folder)",
                  font=self.font_body, bg=CARD, fg=TEXT_SEC).pack(anchor="w")
         path_entry = tk.Entry(form, font=self.font_body, relief="flat",
                               bg=BG, fg=TEXT_PRI)
         path_entry.pack(fill="x", pady=(2, 16), ipady=6)
+
+        # --- Auto-capture checkbox ---
+        auto_var = tk.BooleanVar(value=self.auto_capture_enabled)
+        auto_check = tk.Checkbutton(
+            form,
+            text="Auto-capture",
+            variable=auto_var,
+            font=self.font_body,
+            bg=CARD,
+            fg=TEXT_PRI,
+            activebackground=CARD,
+            selectcolor=CARD,
+            anchor="w"
+        )
+        auto_check.pack(fill="x", pady=(0, 10))
 
         # --- Load existing saved values into fields ---
         settings = self._load_settings()
@@ -560,7 +595,6 @@ class FaceRecognitionApp:
                 decrypted_pwd = f.decrypt(settings["password"].encode()).decode()
                 password_entry.insert(0, decrypted_pwd)
             except Exception:
-                # fallback if decryption fails (e.g. old plain text)
                 password_entry.insert(0, settings["password"])
         if settings.get("pc_save_path"):
             path_entry.insert(0, settings["pc_save_path"])
@@ -575,7 +609,6 @@ class FaceRecognitionApp:
             pwd     = password_entry.get().strip()
             unc     = path_entry.get().strip()
 
-            # Step 1: Validate all fields filled
             if not ntid or not pwd or not unc:
                 messagebox.showerror("Error", "Please fill in all three fields.", parent=win)
                 return
@@ -583,24 +616,18 @@ class FaceRecognitionApp:
             status_lbl.config(text="Connecting to server...", fg=Warning)
             win.update()
 
-            # Step 2: Convert UNC path → Linux path
-            # \\server\folder  →  //server/folder
             linux_path = unc.replace("\\", "/")
-
             mount_point = "/mnt/pcshare"
             os.makedirs(mount_point, exist_ok=True)
 
-            # Step 3: Unmount first to prevent "device busy" error
             try:
                 subprocess.run(
                     ["sudo", "umount", "-l", mount_point],
                     capture_output=True, text=True, timeout=10
                 )
-                # Ignore errors here — it's fine if nothing was mounted
             except Exception:
                 pass
 
-            # Step 4: Run mount command
             cmd = [
                 "sudo", "mount", "-t", "cifs",
                 linux_path, mount_point,
@@ -615,9 +642,7 @@ class FaceRecognitionApp:
                                      f"Failed to run mount command:\n{e}", parent=win)
                 return
 
-            # Step 5: Check mount result
             if result.returncode != 0:
-                # Mount failed — show exact error, do NOT save
                 err_msg = result.stderr.strip() if result.stderr.strip() else "Unknown error."
                 status_lbl.config(text="Connection failed.", fg=DANGER)
                 messagebox.showerror(
@@ -628,7 +653,6 @@ class FaceRecognitionApp:
                 )
                 return
 
-            # Step 6: Run ls to verify we actually have access
             try:
                 ls_result = subprocess.run(
                     ["ls", mount_point],
@@ -647,23 +671,22 @@ class FaceRecognitionApp:
                 messagebox.showerror("Error", f"Could not verify access:\n{e}", parent=win)
                 return
 
-            # Step 7: All good — encrypt password and save to settings.json
             try:
                 f       = Fernet(FERNET_KEY)
                 encrypted = f.encrypt(pwd.encode()).decode()
 
                 settings = self._load_settings()
-                settings["username"]    = ntid
-                settings["password"]    = encrypted
-                settings["pc_save_path"] = unc
+                settings["username"]     = ntid
+                settings["password"]     = encrypted
+                settings["pc_save_path"]  = unc
+                settings["auto_capture"]  = auto_var.get()
 
                 with open(SETTINGS_FILE, "w") as file:
                     json.dump(settings, file, indent=4)
 
-                # Update pc_save_path in app memory
                 self.pc_save_path = mount_point
+                self.auto_capture_enabled = auto_var.get()
 
-                # Update the read-only field on main page
                 self.pc_path_entry.config(state="normal")
                 self.pc_path_entry.delete(0, tk.END)
                 self.pc_path_entry.insert(0, unc)
@@ -682,8 +705,76 @@ class FaceRecognitionApp:
 
         self._btn(win, "Save & Connect", ACCENT, save).pack(pady=(0, 12))
 
+        # ── Admin Management (only visible when admin is logged in) ──
+        if self.current_user:
+            tk.Frame(win, bg=BORDER, height=1).pack(fill="x", padx=24, pady=(4, 8))
+
+            tk.Label(win, text="Admin Management", font=self.font_label,
+                     bg=CARD, fg=TEXT_PRI).pack(anchor="w", padx=24)
+
+            # --- Add Admin row ---
+            add_row = tk.Frame(win, bg=CARD)
+            add_row.pack(fill="x", padx=24, pady=(6, 4))
+
+            tk.Label(add_row, text="Add Admin NTID:", font=self.font_body,
+                     bg=CARD, fg=TEXT_SEC).pack(side="left")
+
+            add_entry = tk.Entry(add_row, font=self.font_body, relief="flat",
+                                 bg=BG, fg=TEXT_PRI, width=16)
+            add_entry.pack(side="left", padx=(8, 8), ipady=4)
+
+            def add_admin():
+                new_ntid = add_entry.get().strip()
+                if not new_ntid:
+                    messagebox.showerror("Error", "Please enter an NTID.", parent=win)
+                    return
+                if new_ntid in self.admin_list:
+                    messagebox.showinfo("Already Admin", f"'{new_ntid}' is already an admin.", parent=win)
+                    return
+                # Validate with AD first
+                if not self._validate_ntid_in_ad(new_ntid):
+                    messagebox.showerror("Invalid NTID", f"'{new_ntid}' is not a valid NTID.", parent=win)
+                    return
+                self._save_admin(new_ntid)
+                add_entry.delete(0, tk.END)
+                refresh_admin_list()
+                messagebox.showinfo("Success", f"'{new_ntid}' added as admin.", parent=win)
+
+            self._btn(add_row, "Add", SUCCESS, add_admin).pack(side="left")
+
+            # --- Current admin list with Remove buttons ---
+            tk.Label(win, text="Current Admins:", font=self.font_body,
+                     bg=CARD, fg=TEXT_SEC).pack(anchor="w", padx=24, pady=(8, 2))
+
+            list_frame = tk.Frame(win, bg=CARD)
+            list_frame.pack(fill="x", padx=24)
+
+            def refresh_admin_list():
+                for w in list_frame.winfo_children():
+                    w.destroy()
+                for a in self.admin_list:
+                    row = tk.Frame(list_frame, bg=CARD)
+                    row.pack(fill="x", pady=1)
+
+                    tag = " (you)" if a == self.current_user else ""
+                    tk.Label(row, text=f"{a}{tag}", font=self.font_body,
+                             bg=CARD, fg=TEXT_PRI).pack(side="left", padx=(0, 8))
+
+                    # Cannot remove yourself or last admin
+                    can_remove = (a != self.current_user and len(self.admin_list) > 1)
+                    if can_remove:
+                        def make_remove(ntid=a):
+                            def do_remove():
+                                if messagebox.askyesno("Confirm", f"Remove '{ntid}' from admins?", parent=win):
+                                    if self._remove_admin(ntid):
+                                        refresh_admin_list()
+                            return do_remove
+                        self._btn(row, "Remove", DANGER, make_remove()).pack(side="right")
+
+            refresh_admin_list()
+
     # --------------------------------------------------------
-    # Mount server on startup (reads from settings.json)
+    # Mount server on startup
     # --------------------------------------------------------
     def _mount_server(self):
         import subprocess
@@ -692,12 +783,10 @@ class FaceRecognitionApp:
         username    = settings.get("username")
         enc_password = settings.get("password")
 
-        # If any setting missing, skip silently
         if not unc_path or not username or not enc_password:
             self.log("Server mount skipped: credentials or path not set.", "warn")
             return
 
-        # Decrypt password
         try:
             f = Fernet(FERNET_KEY)
             password = f.decrypt(enc_password.encode()).decode()
@@ -705,12 +794,10 @@ class FaceRecognitionApp:
             self.log(f"Failed to decrypt password: {e}", "error")
             return
 
-        # Convert UNC path to Linux format
         linux_path = unc_path.replace("\\", "/")
         mount_point = "/mnt/pcshare"
         os.makedirs(mount_point, exist_ok=True)
 
-        # Unmount first to prevent device busy error
         try:
             subprocess.run(
                 ["sudo", "umount", "-l", mount_point],
@@ -753,7 +840,7 @@ class FaceRecognitionApp:
             return {}
 
     # --------------------------------------------------------
-    # Load PC path from settings on startup into read-only field
+    # Load PC path and other settings on startup
     # --------------------------------------------------------
     def _load_pc_path(self):
         import json
@@ -768,12 +855,14 @@ class FaceRecognitionApp:
             self.pc_save_path = data.get("pc_save_path")
 
             if self.pc_save_path:
-                # Temporarily unlock to insert, then lock again
                 self.pc_path_entry.config(state="normal")
                 self.pc_path_entry.delete(0, tk.END)
                 self.pc_path_entry.insert(0, self.pc_save_path)
                 self.pc_path_entry.config(state="readonly")
                 self.log(f"Loaded PC save path: {self.pc_save_path}", "info")
+
+            # Load auto-capture setting
+            self.auto_capture_enabled = data.get("auto_capture", False)
 
         except Exception as e:
             self.log(f"Failed to load settings: {e}", "error")
@@ -782,18 +871,21 @@ class FaceRecognitionApp:
     # Permissions
     # --------------------------------------------------------
     def _set_default_permissions(self):
+        # Non-admin: capture, train, delete all disabled
+        # Recognition always available; stop only enabled when a process runs
         self.capture_btn.config(state="disabled")
-        self.snap_btn.config(state="disabled")
         self.train_btn.config(state="disabled")
         self.delete_btn.config(state="disabled")
         self.recog_btn.config(state="normal")
-        self.stop_btn.config(state="normal")
+        self.stop_btn.config(state="disabled")
 
     def _enable_admin_permissions(self):
+        # Admin: capture, train, delete enabled; stop still disabled until process runs
         self.capture_btn.config(state="normal")
         self.train_btn.config(state="normal")
         self.delete_btn.config(state="normal")
-        self.snap_btn.config(state="disabled")
+        self.recog_btn.config(state="normal")
+        self.stop_btn.config(state="disabled")
         self.log("Admin access granted.", "success")
 
     # --------------------------------------------------------
@@ -812,23 +904,25 @@ class FaceRecognitionApp:
             self.log("Login failed: invalid NTID", "error")
             return
 
-        if not self.admin_ntid:
+        if not self.admin_list:
+            # No admin registered yet — first login becomes admin
             self._save_admin(ntid)
             self.current_user = ntid
             self._enable_admin_permissions()
-            messagebox.showinfo("Admin Registered", f"{ntid} is now the admin.")
+            self.user_label.config(text=f"Logged in as: {self.current_user} (Admin)")
+            self.logout_btn.config(state="normal")
+            messagebox.showinfo("Admin Registered", f"{ntid} is now the first admin.")
             return
 
-        if ntid == self.admin_ntid:
+        if ntid in self.admin_list:
             self.current_user = ntid
             self._enable_admin_permissions()
+            self.user_label.config(text=f"Logged in as: {self.current_user} (Admin)")
+            self.logout_btn.config(state="normal")
             messagebox.showinfo("Login Success", "Admin access granted.")
         else:
-            messagebox.showerror("Access Denied", "You are not the admin.")
-            self.log("Login denied: not admin", "error")
-
-        self.user_label.config(text=f"Logged in as: {self.current_user} (Admin)")
-        self.logout_btn.config(state="normal")
+            messagebox.showerror("Access Denied", "You are not an admin.")
+            self.log("Login denied: not in admin list", "error")
 
     # --------------------------------------------------------
     # Logout
@@ -873,11 +967,20 @@ class FaceRecognitionApp:
         self._capture_running = True
         self._capture_event.clear()
         self._stop_capture_event.clear()
-        self.capture_btn.config(state="disabled")
+
+        # ── Toggle capture_btn → "Take Photo" ──
+        self.capture_btn.config(
+            text="Take Photo",
+            bg=SUCCESS,
+            activebackground=SUCCESS,
+            command=self.trigger_capture
+        )
+        self.delete_btn.config(state="disabled")
+        self.train_btn.config(state="disabled")
         self.recog_btn.config(state="disabled")
-        self.snap_btn.config(state="normal")
         self.stop_btn.config(state="normal")
-        self.log(f"Starting capture for '{name}'...", "info")
+        mode_label = "auto-detect" if self.auto_capture_enabled else "manual"
+        self.log(f"Starting capture for '{name}' [{mode_label} mode]...", "info")
 
         def frame_cb(frame):
             self._show_frame(frame)
@@ -894,9 +997,52 @@ class FaceRecognitionApp:
                     name, mode="add",
                     save_base=save_base,
                     frame_callback=frame_cb,
-                    stop_flag=lambda: self._stop_capture_event.is_set()
+                    stop_flag=lambda: self._stop_capture_event.is_set(),
+                    auto_capture=self.auto_capture_enabled
                 )
-                self.log(f"Capture done. {captured} new photos. Total: {total}", "success")
+                if self.auto_capture_enabled and captured >= 10:
+                    self.log(f"Auto-capture complete. {captured} photos saved. Total: {total}", "success")
+                    # Show finish popup on main thread, wait for user to close it
+                    popup_closed = Event()
+
+                    def show_finish_popup(n=name, c=captured, ev=popup_closed):
+                        popup = tk.Toplevel(self.root)
+                        popup.title("Capture Complete")
+                        popup.geometry("340x160")
+                        popup.resizable(False, False)
+                        popup.configure(bg=CARD)
+                        popup.grab_set()
+
+                        tk.Label(
+                            popup,
+                            text="✅  Auto-Capture Finished",
+                            font=self.font_label,
+                            bg=CARD, fg=TEXT_PRI
+                        ).pack(pady=(24, 8))
+
+                        tk.Label(
+                            popup,
+                            text=f"Captured {n.upper()} for {c} photos.",
+                            font=self.font_body,
+                            bg=CARD, fg=TEXT_SEC
+                        ).pack(pady=(0, 20))
+
+                        def on_close():
+                            popup.destroy()
+                            ev.set()   # unblock background thread
+
+                        self._btn(popup, "Close", ACCENT, on_close).pack()
+
+                        popup.protocol("WM_DELETE_WINDOW", on_close)
+
+                    self.root.after(0, show_finish_popup)
+                    popup_closed.wait()   # block thread until user clicks Close
+
+                    # Trigger stop to clear canvas after popup closed
+                    self.root.after(0, self.stop_all)
+
+                else:
+                    self.log(f"Capture done. {captured} new photos. Total: {total}", "success")
                 self.refresh_dataset()
             except Exception as e:
                 self.log(f"Capture error: {e}", "error")
@@ -904,12 +1050,23 @@ class FaceRecognitionApp:
                 self._capture_running = False
                 self._capture_event.clear()
                 self._stop_capture_event.clear()
+                # ── Revert capture_btn → "Capture Face" ──
+                self.capture_btn.config(
+                    text="Capture Face",
+                    bg=ACCENT,
+                    activebackground=ACCENT_HOV,
+                    command=self.start_capture
+                )
+                # Restore buttons based on login state
                 if self.current_user:
+                    self.delete_btn.config(state="normal")
+                    self.train_btn.config(state="normal")
                     self.capture_btn.config(state="normal")
                 else:
-                    self.capture_btn.config(state="normal")
+                    self.delete_btn.config(state="disabled")
+                    self.train_btn.config(state="disabled")
+                    self.capture_btn.config(state="disabled")
                 self.recog_btn.config(state="normal")
-                self.snap_btn.config(state="disabled")
                 self.stop_btn.config(state="disabled")
 
         Thread(target=thread, daemon=True).start()
@@ -976,7 +1133,6 @@ class FaceRecognitionApp:
                 start_recognition(
                     frame_callback=frame_cb,
                     stop_flag=lambda: self.stop_flag,
-                    #server_path=self.pc_save_path
                 )
             except Exception as e:
                 self.log(f"Recognition error: {e}", "error")
@@ -1000,6 +1156,14 @@ class FaceRecognitionApp:
         self.stop_flag = True
         self._stop_capture_event.set()
         self.log("Stopping...", "warn")
+        # If capture was running, revert capture_btn immediately on stop
+        if self._capture_running:
+            self.capture_btn.config(
+                text="Capture Face",
+                bg=ACCENT,
+                activebackground=ACCENT_HOV,
+                command=self.start_capture
+            )
         self.root.after(500, self._clear_canvas)
 
     # --------------------------------------------------------
