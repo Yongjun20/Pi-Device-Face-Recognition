@@ -235,7 +235,7 @@ class FaceRecognitionApp:
         name_row = tk.Frame(inner, bg=CARD)
         name_row.pack(fill="x", pady=(0, 12))
 
-        tk.Label(name_row, text="Person Name", font=self.font_label,
+        tk.Label(name_row, text="NTID / Username", font=self.font_label,
                  bg=CARD, fg=TEXT_PRI).pack(anchor="w")
 
         entry_frame = tk.Frame(name_row, bg=BORDER, bd=0)
@@ -287,22 +287,22 @@ class FaceRecognitionApp:
         # ----------------------------
         # PC Save Path — read only, shows value from settings
         # ----------------------------
-        settings_frame = tk.Frame(inner, bg=CARD)
-        settings_frame.pack(fill="x", pady=(12, 0))
+        #settings_frame = tk.Frame(inner, bg=CARD)
+        #settings_frame.pack(fill="x", pady=(12, 0))
 
-        tk.Label(settings_frame, text="PC Save Path (set via ⚙ Settings)",
-                 font=self.font_label, bg=CARD, fg=TEXT_SEC).pack(anchor="w")
+        #tk.Label(settings_frame, text="PC Save Path (set via ⚙ Settings)",
+          #       font=self.font_label, bg=CARD, fg=TEXT_SEC).pack(anchor="w")
 
-        self.pc_path_entry = tk.Entry(
-            settings_frame,
-            font=self.font_body,
-            bg="#F3F4F6",
-            fg=TEXT_SEC,
-            relief="flat",
-            insertbackground=TEXT_PRI,
-            state="readonly"
-        )
-        self.pc_path_entry.pack(fill="x", pady=(4, 6), ipady=6, ipadx=6)
+        #self.pc_path_entry = tk.Entry(
+         #   settings_frame,
+         #   font=self.font_body,
+          #  bg="#F3F4F6",
+          #  fg=TEXT_SEC,
+          #  relief="flat",
+          #  insertbackground=TEXT_PRI,
+           # state="readonly"
+       # )
+       # self.pc_path_entry.pack(fill="x", pady=(4, 6), ipady=6, ipadx=6)
 
     # --------------------------------------------------------
     # Right panel: dataset + log
@@ -564,7 +564,7 @@ class FaceRecognitionApp:
         eye_btn.bind("<Leave>", hide_password)
 
         # --- PC Server Path field ---
-        tk.Label(form, text="PC Server Path  (e.g. \\\\server\\folder)",
+        tk.Label(form, text="Save Log Path (e.g. \\\\server\\folder)",
                  font=self.font_body, bg=CARD, fg=TEXT_SEC).pack(anchor="w")
         path_entry = tk.Entry(form, font=self.font_body, relief="flat",
                               bg=BG, fg=TEXT_PRI)
