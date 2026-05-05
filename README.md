@@ -25,9 +25,9 @@ This project is a comprehensive face recognition system designed for Raspberry P
   - Pillow (Pillow) for image processing
   - cryptography for encryption
   - 
-equests for HTTP requests
+Requests for HTTP requests
   - 
-umpy (dependency of face_recognition)
+Numpy (dependency of face_recognition)
 
 Install dependencies using pip:
 
