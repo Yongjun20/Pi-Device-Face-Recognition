@@ -1,6 +1,6 @@
 # Face Recognition System
 
-This project is a comprehensive face recognition system designed for Raspberry Pi, featuring a graphical user interface (GUI) built with Tkinter. It utilizes OpenCV for face detection, the ace_recognition library for encoding and matching faces, and integrates with external services for logging and data synchronization.
+This project is a comprehensive face recognition system designed for Raspberry Pi, featuring a graphical user interface (GUI) built with Tkinter. It utilizes OpenCV for face detection, the Face_recognition library for encoding and matching faces, and integrates with external services for logging and data synchronization.
 
 ## Features
 
@@ -19,18 +19,19 @@ This project is a comprehensive face recognition system designed for Raspberry P
 - **Software**:
   - Python 3.7+
   - OpenCV (opencv-python)
-  - ace_recognition library
+  - face_recognition library
   - picamera2 for camera access
   - Tkinter (usually included with Python)
   - Pillow (Pillow) for image processing
   - cryptography for encryption
-  - equests for HTTP requests
+  - 
+equests for HTTP requests
   - 
 umpy (dependency of face_recognition)
 
 Install dependencies using pip:
 
-`ash
+`bash
 pip install opencv-python face-recognition picamera2 pillow cryptography requests numpy
 `
 
@@ -60,13 +61,14 @@ For Raspberry Pi, ensure PiCamera2 is properly installed and configured.
 
 - capture.py: Handles face capture from camera, face detection, and image saving.
 - gui.py: Main application file with Tkinter GUI, threading for background tasks, and integration with other modules.
-- ecog.py: Manages face recognition, encoding loading, and event handling/logging.
-- 	rain.py: Processes dataset images to generate face encodings and save to pickle file.
+- 
+ecog.py: Manages face recognition, encoding loading, and event handling/logging.
+- train.py: Processes dataset images to generate face encodings and save to pickle file.
 - README.md: This documentation file.
 - dataset/: Folder containing subfolders for each person's face images.
 - encodings.pickle: Serialized file containing trained face encodings and metadata.
 - user.json: Local user data file, synced with server.
-- dmins.txt: List of admin users.
+- admins.txt: List of admin users.
 - settings.json: Application settings.
 - LOG/: Folder for log files.
 
